@@ -23,7 +23,7 @@ struct Config {
 
 #[derive(Debug, StructOpt)]
 struct Cli {
-    #[structopt(help = "allowed argument are <get> or <put>")]
+    #[structopt(help = "allowed arguments are <get> or <put> or <set> or <list-config>")]
     action: String,
 
     #[structopt(long, short, help = "File you want to upload to s3 bucket")]
@@ -35,7 +35,7 @@ struct Cli {
     #[structopt(
         long,
         short,
-        help = "Folder you want to upload to s3 bucket, folder within the path will be ignore"
+        help = "Recursively upload files in folder to s3 bucket"
     )]
     folder: Option<String>,
 
@@ -90,7 +90,7 @@ endpoint = "{}"
 region = "{}""#,
         access_key, secret_key, bucket, endpoint, region
     );
-    let config_dir = home_dir().unwrap().join(".s3-push");
+    let config_dir = home_dir().unwrap().join(".bkt");
     create_dir_all(&config_dir).await.unwrap();
 
     let path = Path::new(&config_dir).join("config.toml");
@@ -111,11 +111,11 @@ region = "{}""#,
 }
 
 fn read_config() -> Result<Config, Error> {
-    let config_path = home_dir().unwrap().join(".s3-push").join("config.toml");
+    let config_path = home_dir().unwrap().join(".bkt").join("config.toml");
 
     let mut file = match File::open(&config_path) {
         Err(_) => {
-            return Err(Error::new(ErrorKind::NotFound, "config file is not set, please run s3-push --config <access-key> <secret-key>, <bucket>, <endpoint>, <region>"));
+            return Err(Error::new(ErrorKind::NotFound, "config file is not set, please run \nbkt set --config <access-key> <secret-key>, <bucket>, <endpoint>, <region>"));
         }
         Ok(file) => file,
     };
@@ -208,7 +208,7 @@ async fn push_objects(
     dest: &str,
     alt_bucket_name: Option<String>,
 ) -> Result<(i32, i32, i32), Error> {
-    if Path::new(src).exists() {
+    if Path::new(src).exists() && Path::new(src).is_dir() {
         let mut loader = Infinite::new().to_stderr();
         loader.set_msg("Uploading");
         let _start_thread = loader.start()?;
@@ -260,19 +260,7 @@ async fn main() -> CliResult {
         "get" => {
             println!("Function not implemented");
         }
-        "put" => {
-            if !&args.config.is_empty() {
-                let access_key = &args.config[0];
-                let secret_key = &args.config[1];
-                let bucket = &args.config[2];
-                let endpoint = &args.config[3];
-                let region = &args.config[4];
-
-                setup_config(access_key, secret_key, bucket, endpoint, region)
-                    .await
-                    .unwrap();
-            }
-
+        "put" => {        
             if let (Some(src), Some(dest)) = (args.source, &args.destination) {
                 //println!("file name: {}, {}", src, dest);
                 match push_object(&src, &dest, args.bucket, args.content_type).await {
@@ -290,7 +278,38 @@ async fn main() -> CliResult {
                     Err(err) => println!("Put folder error for {} : {}", folder, err),
                 }
             }
-        }
+        },
+        "list-config" => {
+            match read_config() {
+                Err(err) => {
+                    println!("{}", err);
+                }
+                Ok(config) => {
+                    println!("Current bkt configuration");
+                    println!("-------------------------");
+                    println!("access-key    : {}", config.access_key);
+                    println!("secret-key    : {}", config.secret_key);
+                    println!("bucket        : {}", config.bucket);
+                    println!("endpoint      : {}", config.endpoint);
+                    println!("region        : {}", config.region);
+                },
+            };
+        },
+        "set" => {
+            if !&args.config.is_empty() {
+                let access_key = &args.config[0];
+                let secret_key = &args.config[1];
+                let bucket = &args.config[2];
+                let endpoint = &args.config[3];
+                let region = &args.config[4];
+
+                setup_config(access_key, secret_key, bucket, endpoint, region)
+                    .await
+                    .unwrap();
+            } else {
+                println!("current <set> action only supported for config, please run \nbkt set --config <access-key> <secret-key>, <bucket>, <endpoint>, <region>")
+            }
+        },
         _ => println!("Invalid action, only <get> or <put> is allowed."),
     };
 
