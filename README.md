@@ -1,4 +1,4 @@
-# bkt - CLI tool to download and upload files from / to s3 compatible storage.
+## bkt - CLI tool to download and upload files from / to s3 compatible storage.
 
 You can install this tool with the following commands:
 
@@ -56,5 +56,52 @@ OPTIONS:
 ARGS:
     <action>    allowed arguments are <get> or <put> or <set> or <list-config>
 
+```
+
+bkt will first need to setup config value in order to put objects to targeted s3 storage
+```
+bkt set --config AWSACCESSKEY AWSSECRETKEY image-folder - cn-north-1
+
+```
+
+bkt put folder to s3 storage
+```
+bkt put --folder $(pwd) --destination /target-folder/weekend/images
+```
+
+bkt put single file to s3 storage
+```
+bkt put --source ./test.txt --destination /target-folder/weekday/test.txt
+```
+
+Available region arguments
+```
+us-east-2
+us-west-1
+us-west-2
+ca-central-1
+ap-south-1
+ap-northeast-1
+ap-northeast-2
+ap-northeast-3
+ap-southeast-1
+ap-southeast-2
+cn-north-1
+cn-northwest-1
+eu-north-1
+eu-central-1
+eu-west-1
+eu-west-2
+eu-west-3
+me-south-1
+sa-east-1
+Digital Ocean nyc3
+Digital Ocean ams3
+Digital Ocean sgp1
+Yandex Object Storage
+Wasabi us-east-1
+Wasabi us-east-2
+Wasabi us-west-1
+Wasabi eu-central-1
 ```
 

@@ -1,5 +1,6 @@
 use circle_rs::{Infinite, Progress};
 use dirs::home_dir;
+use indicatif::ProgressBar;
 use quicli::prelude::*;
 use s3::creds::Credentials;
 use s3::{Bucket, Region};
@@ -168,7 +169,7 @@ async fn push_object(
     content_type: Option<String>,
 ) -> Result<u16, Error> {
     let s3_bucket = init_bucket(alt_bucket_name).await.unwrap();
-    
+
     match File::open(src) {
         Err(why) => {
             return Err(why);
@@ -184,7 +185,7 @@ async fn push_object(
                     .unwrap();
                 Ok(result.1)
             } else {
-                let result = s3_bucket.put_object(dest, &bytes.to_vec()).await.unwrap();                
+                let result = s3_bucket.put_object(dest, &bytes.to_vec()).await.unwrap();
                 Ok(result.1)
             }
         }
@@ -197,13 +198,27 @@ async fn push_objects(
     alt_bucket_name: Option<String>,
 ) -> Result<(i32, i32, i32), Error> {
     if Path::new(src).exists() && Path::new(src).is_dir() {
-        let mut loader = Infinite::new().to_stderr();
-        loader.set_msg("Uploading");
-        let _start_thread = loader.start()?;
+        // let mut loader = Infinite::new().to_stderr();
+        // loader.set_msg("Uploading");
+        // let _start_thread = loader.start()?;
         let now = Instant::now();
 
         let mut fail_count: i32 = 0;
         let mut success_count: i32 = 0;
+
+        let total_count: u64 = WalkDir::new(src)
+            .contents_first(true)
+            .into_iter()
+            .filter_map(|dir| {
+                if dir.unwrap().path().is_file() {
+                    Some(1)
+                } else {
+                    None
+                }
+            })
+            .sum();
+        
+        let pb = ProgressBar::new(total_count);
         for file in WalkDir::new(src).contents_first(true).into_iter() {
             match file {
                 Err(err) => {
@@ -216,17 +231,20 @@ async fn push_objects(
                         // println!("file: {}", dir_entry.path().display());
                         let src_file = format!("{}", dir_entry.path().display());
                         let s3_file_dest = dir_entry.path().to_string_lossy().replace(src, dest);
-                        // println!("Pushing {} to {}", src_file, s3_file_dest);
+                        // println!("Pushing to {}", s3_file_dest);
                         push_object(&src_file, &s3_file_dest, alt_bucket_name.clone(), None)
                             .await
                             .unwrap();
+                        std::thread::sleep(std::time::Duration::from_millis(1000));
                         success_count = success_count + 1;
                     }
                 }
             };
+            pb.inc(1);
         }
 
-        loader.stop()?;
+        // loader.stop()?;
+        pb.finish_with_message("done");
         println!("Finished in {:?}", now.elapsed());
         Ok((fail_count, success_count, fail_count + success_count))
     } else {
@@ -259,14 +277,13 @@ async fn main() -> CliResult {
                         loader.stop()?;
                         println!("Finished in {:?}", now.elapsed());
                         println!("File successfully put with status code: {}", code)
-                    },
+                    }
                     Err(err) => {
-                        loader.stop()?;                        
+                        loader.stop()?;
                         println!("Put file error for {} : {}", src, err)
-                    },
+                    }
                 };
-            } else if let (Some(folder), Some(dest)) = (args.folder, &args.destination) {
-                //println!("folder path: {}", folder);
+            } else if let (Some(folder), Some(dest)) = (args.folder, &args.destination) {                
                 match push_objects(&folder, &dest, args.bucket).await {
                     Ok(count) => {
                         println!("{} failed to upload", count.0);
