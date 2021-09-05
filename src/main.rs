@@ -4,10 +4,10 @@ use quicli::prelude::*;
 use s3::creds::Credentials;
 use s3::{Bucket, Region};
 use std::fmt::Debug;
+use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read, Write};
 use std::path::Path;
 use std::time::Instant;
-use std::fs::File;
 use structopt::StructOpt;
 use tokio::fs::create_dir_all;
 use walkdir::WalkDir;
@@ -32,11 +32,7 @@ struct Cli {
     #[structopt(long, short, help = "Location you want to put in s3 bucket")]
     destination: Option<String>,
 
-    #[structopt(
-        long,
-        short,
-        help = "Recursively upload files in folder to s3 bucket"
-    )]
+    #[structopt(long, short, help = "Recursively upload files in folder to s3 bucket")]
     folder: Option<String>,
 
     // Quick and easy logging setup you get for free with quicli
@@ -196,7 +192,7 @@ async fn push_object(
             } else {
                 let result = s3_bucket.put_object(dest, &bytes.to_vec()).await.unwrap();
                 loader.stop()?;
-        println!("Finished in {:?}", now.elapsed());
+                println!("Finished in {:?}", now.elapsed());
                 Ok(result.1)
             }
         }
@@ -215,7 +211,7 @@ async fn push_objects(
         let now = Instant::now();
 
         let mut fail_count: i32 = 0;
-        let mut success_count: i32 = 0;        
+        let mut success_count: i32 = 0;
         for file in WalkDir::new(src).contents_first(true).into_iter() {
             match file {
                 Err(err) => {
@@ -236,9 +232,8 @@ async fn push_objects(
                     }
                 }
             };
-
         }
-        
+
         loader.stop()?;
         println!("Finished in {:?}", now.elapsed());
         Ok((fail_count, success_count, fail_count + success_count))
@@ -252,7 +247,7 @@ async fn push_objects(
 
 #[tokio::main]
 async fn main() -> CliResult {
-    let args = Cli::from_args();    
+    let args = Cli::from_args();
 
     let action = args.action.to_lowercase();
 
@@ -260,7 +255,7 @@ async fn main() -> CliResult {
         "get" => {
             println!("Function not implemented");
         }
-        "put" => {        
+        "put" => {
             if let (Some(src), Some(dest)) = (args.source, &args.destination) {
                 //println!("file name: {}, {}", src, dest);
                 match push_object(&src, &dest, args.bucket, args.content_type).await {
@@ -278,7 +273,7 @@ async fn main() -> CliResult {
                     Err(err) => println!("Put folder error for {} : {}", folder, err),
                 }
             }
-        },
+        }
         "list-config" => {
             match read_config() {
                 Err(err) => {
@@ -292,9 +287,9 @@ async fn main() -> CliResult {
                     println!("bucket        : {}", config.bucket);
                     println!("endpoint      : {}", config.endpoint);
                     println!("region        : {}", config.region);
-                },
+                }
             };
-        },
+        }
         "set" => {
             if !&args.config.is_empty() {
                 let access_key = &args.config[0];
@@ -309,7 +304,7 @@ async fn main() -> CliResult {
             } else {
                 println!("current <set> action only supported for config, please run \nbkt set --config <access-key> <secret-key>, <bucket>, <endpoint>, <region>")
             }
-        },
+        }
         _ => println!("Invalid action, only <get> or <put> is allowed."),
     };
 

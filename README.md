@@ -3,7 +3,7 @@
 You can install this tool with the following commands:
 
 ```
-curl -L https://github.com/YJChan/bkt/releases/download/v0.1.0-6d1d8be/bkt-linux-amd64 > bkt
+curl -L https://github.com/YJChan/bkt/releases/download/v0.1.0/bkt-linux-amd64 > bkt
 
 mkdir -p ~/bin && mkdir -p $HOME/.bkt/bin && mv ./bkt $HOME/.bkt/bin
 
