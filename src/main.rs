@@ -168,11 +168,7 @@ async fn push_object(
     content_type: Option<String>,
 ) -> Result<u16, Error> {
     let s3_bucket = init_bucket(alt_bucket_name).await.unwrap();
-    let mut loader = Infinite::new().to_stderr();
-    loader.set_msg("Uploading");
-    let _start_thread = loader.start()?;
-    let now = Instant::now();
-
+    
     match File::open(src) {
         Err(why) => {
             return Err(why);
@@ -186,13 +182,9 @@ async fn push_object(
                     .put_object_with_content_type(dest, &bytes.to_vec(), &content_type)
                     .await
                     .unwrap();
-                loader.stop()?;
-                println!("Finished in {:?}", now.elapsed());
                 Ok(result.1)
             } else {
-                let result = s3_bucket.put_object(dest, &bytes.to_vec()).await.unwrap();
-                loader.stop()?;
-                println!("Finished in {:?}", now.elapsed());
+                let result = s3_bucket.put_object(dest, &bytes.to_vec()).await.unwrap();                
                 Ok(result.1)
             }
         }
@@ -257,10 +249,21 @@ async fn main() -> CliResult {
         }
         "put" => {
             if let (Some(src), Some(dest)) = (args.source, &args.destination) {
-                //println!("file name: {}, {}", src, dest);
+                let mut loader = Infinite::new().to_stderr();
+                loader.set_msg("Uploading");
+                let _start_thread = loader.start()?;
+                let now = Instant::now();
+
                 match push_object(&src, &dest, args.bucket, args.content_type).await {
-                    Ok(code) => println!("File successfully put with status code: {}", code),
-                    Err(err) => println!("Put file error for {} : {}", src, err),
+                    Ok(code) => {
+                        loader.stop()?;
+                        println!("Finished in {:?}", now.elapsed());
+                        println!("File successfully put with status code: {}", code)
+                    },
+                    Err(err) => {
+                        loader.stop()?;                        
+                        println!("Put file error for {} : {}", src, err)
+                    },
                 };
             } else if let (Some(folder), Some(dest)) = (args.folder, &args.destination) {
                 //println!("folder path: {}", folder);
