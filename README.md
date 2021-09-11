@@ -1,5 +1,11 @@
 ## bkt - CLI tool to download and upload files from / to s3 compatible storage.
 
+
+```bkt put -f ./ /target-path-in-s3/ -w 10```
+![demo](https://raw.githubusercontent.com/YJChan/bkt/main/bkt-demo.gif)
+
+The example above is pushing images to Linode object storage. Average file size is about 200KB to 350KB. The run finish in 76s.
+
 ### Installation:
 
 ```
