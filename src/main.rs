@@ -321,7 +321,7 @@ async fn main() -> CliResult {
                         .collect();
                     
                     println!("Uploading {} file(s)", src_folder_list.len());
-                    println!("------------------------------------");
+                    println!("------------------------------------------------");
                     
                     let m = MultiProgress::new();
                     let chunk_size = src_folder_list.len() / worker_size as usize;
@@ -367,7 +367,7 @@ async fn main() -> CliResult {
                                             println!("Put file error for {} : {}", file, err);
                                         }
                                     };
-                                    pb.set_prefix(format!("{:.6}s", now.elapsed().as_secs_f32()));
+                                    pb.set_prefix(format!("[{}/{}]{:.6}s", index, len, now.elapsed().as_secs_f32()));
                                     pb.inc(1);
                                     index = index + 1;
                                     pb.set_message(format!("{:3}%", 100 * index / len));

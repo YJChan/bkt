@@ -9,7 +9,7 @@ The example above is pushing images to Linode object storage. Average file size 
 ### Installation:
 
 ```
-curl -L https://github.com/YJChan/bkt/releases/download/v0.2.3/bkt-linux-amd64 > bkt
+curl -L https://github.com/YJChan/bkt/releases/download/v0.2.4/bkt-linux-amd64 > bkt
 
 mkdir -p ~/bin && mkdir -p $HOME/.bkt/bin && mv ./bkt $HOME/.bkt/bin
 
