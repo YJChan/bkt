@@ -1,6 +1,6 @@
 use circle_rs::{Infinite, Progress};
 use dirs::home_dir;
-use indicatif::ProgressBar;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use quicli::prelude::*;
 use s3::creds::Credentials;
 use s3::{Bucket, Region};
@@ -24,7 +24,9 @@ struct Config {
 
 #[derive(Debug, StructOpt)]
 struct Cli {
-    #[structopt(help = "allowed arguments are <get> or <put> or <set> or <list-config>")]
+    #[structopt(
+        help = "allowed arguments are <get> or <put> or <rm> or <set> or <list-config> or <count>"
+    )]
     action: String,
 
     #[structopt(long, short, help = "File you want to upload to s3 bucket")]
@@ -70,6 +72,9 @@ struct Cli {
         help = "Limit number of files to be upload when uploading a folder"
     )]
     limit: Option<String>,
+
+    #[structopt(long, short, help = "Put files with N workers")]
+    worker: Option<String>,
 }
 
 async fn setup_config(
@@ -217,7 +222,7 @@ async fn push_objects(
                 }
             })
             .sum();
-        
+
         let pb = ProgressBar::new(total_count);
         for file in WalkDir::new(src).contents_first(true).into_iter() {
             match file {
@@ -235,7 +240,7 @@ async fn push_objects(
                         push_object(&src_file, &s3_file_dest, alt_bucket_name.clone(), None)
                             .await
                             .unwrap();
-                        std::thread::sleep(std::time::Duration::from_millis(1000));
+                        // std::thread::sleep(std::time::Duration::from_millis(1000));
                         success_count = success_count + 1;
                     }
                 }
@@ -258,6 +263,13 @@ async fn push_objects(
 #[tokio::main]
 async fn main() -> CliResult {
     let args = Cli::from_args();
+    let styles = [
+        ("Uploading: ", "█  ", "red"),
+        ("Uploading: ", "█▉▊▋▌▍▎▏  ", "yellow"),
+        ("Uploading: ", "█▇▆▅▄▃▂▁  ", "green"),
+        ("Uploading: ", "█▓▒░  ", "blue"),
+        ("Uploading: ", "█▛▌▖  ", "magenta"),
+    ];
 
     let action = args.action.to_lowercase();
 
@@ -283,14 +295,86 @@ async fn main() -> CliResult {
                         println!("Put file error for {} : {}", src, err)
                     }
                 };
-            } else if let (Some(folder), Some(dest)) = (args.folder, &args.destination) {                
-                match push_objects(&folder, &dest, args.bucket).await {
-                    Ok(count) => {
-                        println!("{} failed to upload", count.0);
-                        println!("{} successed to upload", count.1);
-                        println!("{} total number of files processed", count.2);
+            } else if let (Some(folder), Some(dest)) = (args.folder, &args.destination) {
+                if let Some(w) = args.worker {                    
+                    let worker_size: i16 = w.parse().unwrap();
+
+                    let src_folder_list: Vec<String> = WalkDir::new(&folder)
+                        .contents_first(true)
+                        .into_iter()
+                        .filter_map(|dir| {
+                            let directory = dir.unwrap();
+                            if directory.path().is_file() {
+                                Some(directory.path().to_str().unwrap().to_string())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    let m = MultiProgress::new();
+                    let chunk_size = src_folder_list.len() / worker_size as usize;
+                    let chunks_folder_list: Vec<Vec<String>> = src_folder_list
+                        .chunks(chunk_size)
+                        .map(|c| c.to_owned())
+                        .collect();                    
+
+                    let bucket = if let Some(bucket) = args.bucket {
+                        bucket.to_string()
+                    } else {
+                        "".to_string()
+                    };
+
+                    let handlers: Vec<_> = chunks_folder_list
+                        .into_iter()
+                        .map(|folder_list| {
+                            let pb = m.add(ProgressBar::new(folder_list.len() as u64));
+                            pb.set_style(
+                                ProgressStyle::default_bar()
+                                    .template(&format!(
+                                        "{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}",
+                                        styles[1].2
+                                    ))
+                                    .progress_chars(styles[1].1),
+                            );                            
+                            let destination = dest.clone();
+                            let b = bucket.clone();
+                            tokio::spawn(async move {
+                                let now = Instant::now();
+                                let len = folder_list.len();
+                                let mut index = 0;                                
+                                for file in folder_list {
+                                    match push_object(&file, &destination, Some(b.clone()), None)
+                                        .await
+                                    {
+                                        Ok(_) => (),
+                                        Err(err) => {
+                                            println!("Put file error for {} : {}", file, err);
+                                        }
+                                    };
+                                    pb.set_prefix(format!("{:.6}", now.elapsed().as_secs_f32()));
+                                    pb.inc(1);
+                                    index = index + 1;
+                                    pb.set_message(format!("{:3}%", 100 * index / len));
+                                    // thread::sleep(std::time::Duration::from_millis(1000));                                    
+                                }
+                                pb.finish_with_message("100%");
+                            })
+                        })
+                        .collect();
+
+                    for h in handlers {
+                        let _ = h.await.unwrap();
                     }
-                    Err(err) => println!("Put folder error for {} : {}", folder, err),
+                } else {
+                    match push_objects(&folder, &dest, args.bucket).await {
+                        Ok(count) => {
+                            println!("{} failed to upload", count.0);
+                            println!("{} successed to upload", count.1);
+                            println!("{} total number of files processed", count.2);
+                        }
+                        Err(err) => println!("Put folder error for {} : {}", folder, err),
+                    }
                 }
             }
         }
@@ -324,6 +408,29 @@ async fn main() -> CliResult {
             } else {
                 println!("current <set> action only supported for config, please run \nbkt set --config <access-key> <secret-key>, <bucket>, <endpoint>, <region>")
             }
+        }
+        "rm" => {
+            println!("Function not implemented");
+        }
+        "count" => {
+            let src = if let Some(src) = args.folder {
+                src
+            } else {
+                std::env::current_dir().unwrap().display().to_string()
+            };
+
+            let total_count: u64 = WalkDir::new(&src)
+                .contents_first(true)
+                .into_iter()
+                .filter_map(|dir| {
+                    if dir.unwrap().path().is_file() {
+                        Some(1)
+                    } else {
+                        None
+                    }
+                })
+                .sum();
+            println!("Number of files in {}: {}", src, total_count);
         }
         _ => println!("Invalid action, only <get> or <put> is allowed."),
     };
