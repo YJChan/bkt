@@ -297,8 +297,16 @@ async fn main() -> CliResult {
                 };
             } else if let (Some(folder), Some(dest)) = (args.folder, &args.destination) {
                 if let Some(w) = args.worker {
-                    println!("Running with multiple worker thread...");
                     let worker_size: i16 = w.parse().unwrap();
+                    let cpus = num_cpus::get();
+                    println!("Machine has {} cpu(s)", cpus);
+                    println!("Running with {} worker thread(s)", w);
+                    println!("------------------------------------");
+                    
+                    if (worker_size as usize) / cpus > 100 {
+                        println!("WARNING");
+                        println!("You might be running too many threads...");
+                    }
 
                     let src_folder_list: Vec<String> = WalkDir::new(&folder)
                         .contents_first(true)
@@ -357,7 +365,7 @@ async fn main() -> CliResult {
                                             println!("Put file error for {} : {}", file, err);
                                         }
                                     };
-                                    pb.set_prefix(format!("{:.6}", now.elapsed().as_secs_f32()));
+                                    pb.set_prefix(format!("{:.6}s", now.elapsed().as_secs_f32()));
                                     pb.inc(1);
                                     index = index + 1;
                                     pb.set_message(format!("{:3}%", 100 * index / len));

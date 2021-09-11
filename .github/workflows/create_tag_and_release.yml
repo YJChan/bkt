@@ -26,5 +26,5 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/release/bkt
           asset_name: bkt-linux-amd64
-          tag: "v0.2.2"
+          tag: "v0.2.3"
           overwrite: true

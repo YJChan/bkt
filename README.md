@@ -1,9 +1,9 @@
 ## bkt - CLI tool to download and upload files from / to s3 compatible storage.
 
-You can install this tool with the following commands:
+### Installation:
 
 ```
-curl -L https://github.com/YJChan/bkt/releases/download/v0.1.0/bkt-linux-amd64 > bkt
+curl -L https://github.com/YJChan/bkt/releases/download/v0.2.3/bkt-linux-amd64 > bkt
 
 mkdir -p ~/bin && mkdir -p $HOME/.bkt/bin && mv ./bkt $HOME/.bkt/bin
 
@@ -14,7 +14,7 @@ ln -s $HOME/.bkt/bin/bkt ~/bin/bkt
 source ~/.profile
 ```
 
-Sample screen: 
+### Sample screen: 
 ```
 bkt 0.1.0
 
@@ -72,6 +72,11 @@ bkt put --folder $(pwd) --destination /target-folder/weekend/images
 bkt put single file to s3 storage
 ```
 bkt put --source ./test.txt --destination /target-folder/weekday/test.txt
+```
+
+bkt put file with 8 threads
+```
+bkt put -f $(pwd) -d /target-folder/weekend/images -w 8
 ```
 
 Available region arguments
