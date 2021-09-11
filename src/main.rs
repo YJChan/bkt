@@ -296,7 +296,8 @@ async fn main() -> CliResult {
                     }
                 };
             } else if let (Some(folder), Some(dest)) = (args.folder, &args.destination) {
-                if let Some(w) = args.worker {                    
+                if let Some(w) = args.worker {
+                    println!("Running with multiple worker thread...");
                     let worker_size: i16 = w.parse().unwrap();
 
                     let src_folder_list: Vec<String> = WalkDir::new(&folder)
@@ -317,12 +318,12 @@ async fn main() -> CliResult {
                     let chunks_folder_list: Vec<Vec<String>> = src_folder_list
                         .chunks(chunk_size)
                         .map(|c| c.to_owned())
-                        .collect();                    
+                        .collect();
 
                     let bucket = if let Some(bucket) = args.bucket {
                         bucket.to_string()
                     } else {
-                        "".to_string()
+                        String::new()
                     };
 
                     let handlers: Vec<_> = chunks_folder_list
@@ -336,17 +337,21 @@ async fn main() -> CliResult {
                                         styles[1].2
                                     ))
                                     .progress_chars(styles[1].1),
-                            );                            
+                            );
+                            let tmp_bkt_name = bucket.clone();
                             let destination = dest.clone();
-                            let b = bucket.clone();
                             tokio::spawn(async move {
+                                let b = if tmp_bkt_name.is_empty() {
+                                    None
+                                } else {
+                                    Some(tmp_bkt_name)
+                                };
                                 let now = Instant::now();
                                 let len = folder_list.len();
-                                let mut index = 0;                                
+                                let mut index = 0;
+
                                 for file in folder_list {
-                                    match push_object(&file, &destination, Some(b.clone()), None)
-                                        .await
-                                    {
+                                    match push_object(&file, &destination, b.clone(), None).await {
                                         Ok(_) => (),
                                         Err(err) => {
                                             println!("Put file error for {} : {}", file, err);
@@ -356,7 +361,7 @@ async fn main() -> CliResult {
                                     pb.inc(1);
                                     index = index + 1;
                                     pb.set_message(format!("{:3}%", 100 * index / len));
-                                    // thread::sleep(std::time::Duration::from_millis(1000));                                    
+                                    // thread::sleep(std::time::Duration::from_millis(1000));
                                 }
                                 pb.finish_with_message("100%");
                             })
