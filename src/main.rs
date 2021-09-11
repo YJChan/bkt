@@ -300,8 +300,7 @@ async fn main() -> CliResult {
                     let worker_size: i16 = w.parse().unwrap();
                     let cpus = num_cpus::get();
                     println!("Machine has {} cpu(s)", cpus);
-                    println!("Running with {} worker thread(s)", w);
-                    println!("------------------------------------");
+                    println!("Running with {} worker thread(s)", w);                    
                     
                     if (worker_size as usize) / cpus > 100 {
                         println!("WARNING");
@@ -320,7 +319,10 @@ async fn main() -> CliResult {
                             }
                         })
                         .collect();
-
+                    
+                    println!("Uploading {} file(s)", src_folder_list.len());
+                    println!("------------------------------------");
+                    
                     let m = MultiProgress::new();
                     let chunk_size = src_folder_list.len() / worker_size as usize;
                     let chunks_folder_list: Vec<Vec<String>> = src_folder_list
